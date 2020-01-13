@@ -4,6 +4,7 @@
 ## Version: @project-version@
 ## Author: dev7355608
 ## X-Curse-Project-ID: 358421
+## X-WoWI-ID: 25485
 
 libs\LibStub\LibStub.lua
 libs\LibThreatClassic2\lib.xml
