@@ -260,7 +260,11 @@ hooksecurefunc(
             return
         end
 
+        ThreatLib.RegisterCallback(frame, "Activate", OnThreatUpdated, frame)
+        ThreatLib.RegisterCallback(frame, "Deactivate", OnThreatUpdated, frame)
+        ThreatLib.RegisterCallback(frame, "PartyChanged", OnThreatUpdated, frame)
         ThreatLib.RegisterCallback(frame, "ThreatUpdated", OnThreatUpdated, frame)
+        ThreatLib.RegisterCallback(frame, "ThreatCleared", OnThreatUpdated, frame)
     end
 )
 
@@ -271,7 +275,11 @@ hooksecurefunc(
             return
         end
 
+        ThreatLib.UnregisterCallback(frame, "Activate")
+        ThreatLib.UnregisterCallback(frame, "Deactivate")
+        ThreatLib.UnregisterCallback(frame, "PartyChanged")
         ThreatLib.UnregisterCallback(frame, "ThreatUpdated")
+        ThreatLib.UnregisterCallback(frame, "ThreatCleared")
     end
 )
 
