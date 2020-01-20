@@ -186,7 +186,7 @@ local function CompactUnitFrame_UpdateAggroHighlight(frame)
         return
     end
 
-    if not frame.unit then
+    if not frame.unit or frame.unit:find("target$") then
         frame._CAH_aggroHighlight:Hide()
         return
     end
