@@ -241,33 +241,46 @@ end
 
 hooksecurefunc("CompactUnitFrame_UpdateAll", CompactUnitFrame_UpdateAggroHighlight)
 
-hooksecurefunc(
-    "CompactUnitFrame_UpdateUnitEvents",
-    function(frame)
-        if not frame._CAH_aggroHighlight then
-            return
-        end
-
-        ThreatLib.RegisterCallback(frame, "Activate", CompactUnitFrame_UpdateAggroHighlight, frame)
-        ThreatLib.RegisterCallback(frame, "Deactivate", CompactUnitFrame_UpdateAggroHighlight, frame)
-        ThreatLib.RegisterCallback(frame, "PartyChanged", CompactUnitFrame_UpdateAggroHighlight, frame)
-        ThreatLib.RegisterCallback(frame, "ThreatUpdated", CompactUnitFrame_UpdateAggroHighlight, frame)
-        ThreatLib.RegisterCallback(frame, "ThreatCleared", CompactUnitFrame_UpdateAggroHighlight, frame)
+local function updateCallbacks(frame)
+    if not frame._CAH_aggroHighlight then
+        return
     end
-)
+
+    if frame.unit then
+        if not frame._CAH_callbacksRegistered then
+            frame._CAH_callbacksRegistered = true
+
+            ThreatLib.RegisterCallback(frame, "Activate", CompactUnitFrame_UpdateAggroHighlight, frame)
+            ThreatLib.RegisterCallback(frame, "Deactivate", CompactUnitFrame_UpdateAggroHighlight, frame)
+            ThreatLib.RegisterCallback(frame, "PartyChanged", CompactUnitFrame_UpdateAggroHighlight, frame)
+            ThreatLib.RegisterCallback(frame, "ThreatUpdated", CompactUnitFrame_UpdateAggroHighlight, frame)
+            ThreatLib.RegisterCallback(frame, "ThreatCleared", CompactUnitFrame_UpdateAggroHighlight, frame)
+        end
+    else
+        if frame._CAH_callbacksRegistered then
+            frame._CAH_callbacksRegistered = false
+
+            ThreatLib.UnregisterCallback(frame, "Activate")
+            ThreatLib.UnregisterCallback(frame, "Deactivate")
+            ThreatLib.UnregisterCallback(frame, "PartyChanged")
+            ThreatLib.UnregisterCallback(frame, "ThreatUpdated")
+            ThreatLib.UnregisterCallback(frame, "ThreatCleared")
+        end
+    end
+end
+
+hooksecurefunc("CompactUnitFrame_RegisterEvents", updateCallbacks)
+
+hooksecurefunc("CompactUnitFrame_UnregisterEvents", updateCallbacks)
 
 hooksecurefunc(
-    "CompactUnitFrame_UnregisterEvents",
-    function(frame)
-        if not frame._CAH_aggroHighlight then
-            return
-        end
+    "CompactPartyFrame_Generate",
+    function()
+        local name = CompactPartyFrame:GetName()
 
-        ThreatLib.UnregisterCallback(frame, "Activate")
-        ThreatLib.UnregisterCallback(frame, "Deactivate")
-        ThreatLib.UnregisterCallback(frame, "PartyChanged")
-        ThreatLib.UnregisterCallback(frame, "ThreatUpdated")
-        ThreatLib.UnregisterCallback(frame, "ThreatCleared")
+        for i = 1, MEMBERS_PER_RAID_GROUP do
+            updateCallbacks(_G[name .. "Member" .. i])
+        end
     end
 )
 
