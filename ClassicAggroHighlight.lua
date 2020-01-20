@@ -13,29 +13,87 @@ local ThreatLib = LibStub("LibThreatClassic2")
 -- ThreatLib.DebugEnabled = true
 -- ThreatLib:RequestActiveOnSolo()
 
-local function UnitDetailedThreatSituation(unit, target)
-    if unit and UnitIsUnit(unit, "player") then
-        unit = "player"
+local floor = floor
+
+local function GetThreat(unitGUID, targetGUID)
+    local data = ThreatLib.threatTargets[unitGUID]
+    return data and data[targetGUID]
+end
+
+local function GetMaxThreatOnTarget(targetGUID)
+    local maxThreatValue
+    local maxUnitGUID
+
+    for unitGUID, data in pairs(ThreatLib.threatTargets) do
+        local threatValue = data[targetGUID]
+
+        if threatValue then
+            if not maxThreatValue or threatValue > maxThreatValue then
+                maxThreatValue = threatValue
+                maxUnitGUID = unitGUID
+            end
+        end
     end
 
+    return maxThreatValue, maxUnitGUID
+end
+
+local function UnitDetailedThreatSituation(unit, target)
+    local isTanking, threatStatus, threatPercent, rawThreatPercent, threatValue = nil, nil, nil, nil, nil
     local unitGUID, targetGUID = UnitGUID(unit), UnitGUID(target)
 
     if not unitGUID or not targetGUID then
-        return nil
+        return isTanking, threatStatus, threatPercent, rawThreatPercent, threatValue
     end
 
-    local threatValue = ThreatLib:GetThreat(unitGUID, targetGUID)
+    threatValue = GetThreat(unitGUID, targetGUID)
 
     if not threatValue then
-        return nil
+        return isTanking, threatStatus, threatPercent, rawThreatPercent, threatValue
+    elseif threatValue < 0 then
+        threatValue = 0
     end
 
-    return ThreatLib:UnitDetailedThreatSituation(unit, target)
+    isTanking = false
+    threatStatus = 0
+
+    local targetTarget = target .. "-target"
+    local targetTargetGUID = UnitGUID(targetTarget)
+    local targetTargetThreatValue
+
+    if targetTargetGUID then
+        targetTargetThreatValue = GetThreat(targetTargetGUID, targetGUID)
+    end
+
+    if targetTargetThreatValue and targetTargetThreatValue > 0 then
+        if threatValue >= targetTargetThreatValue then
+            if unitGUID == targetTargetGUID then
+                isTanking = true
+
+                local _, maxUnitGUID = GetMaxThreatOnTarget(targetGUID)
+
+                if unitGUID == maxUnitGUID then
+                    threatStatus = 3
+                else
+                    threatStatus = 2
+                end
+            else
+                threatStatus = 1
+            end
+        end
+
+        rawThreatPercent = threatValue / targetTargetThreatValue * 100
+    end
+
+    threatValue = floor(threatValue)
+
+    return isTanking, threatStatus, threatPercent, rawThreatPercent, threatValue
 end
 
 local function UnitThreatSituation(unit, target)
     if target then
-        return (select(2, UnitDetailedThreatSituation(unit, target)))
+        local _, threatStatus = UnitDetailedThreatSituation(unit, target)
+        return threatStatus
     end
 
     local unitGUID = UnitGUID(unit)
@@ -60,27 +118,41 @@ local function UnitThreatSituation(unit, target)
         end
     end
 
-    local status = nil
+    local threatStatus = nil
 
     for targetGUID in pairs(data) do
         local target = targetIDs[targetGUID]
 
         if target then
-            local _, targetStatus = UnitDetailedThreatSituation(unit, target)
+            local _, targetThreatStatus = UnitDetailedThreatSituation(unit, target)
 
-            if not status then
-                status = targetStatus
-            elseif targetStatus and targetStatus > status then
-                status = targetStatus
+            if not threatStatus then
+                threatStatus = targetThreatStatus
+            elseif targetThreatStatus and targetThreatStatus > threatStatus then
+                threatStatus = targetThreatStatus
             end
         end
     end
 
-    return status
+    return threatStatus
 end
 
-local GetThreatStatusColor = function(statusIndex)
-    return ThreatLib:GetThreatStatusColor(statusIndex)
+local function GetThreatStatusColor(statusIndex)
+    if statusIndex == 0 then
+        return 0.69, 0.69, 0.69
+    end
+
+    if statusIndex == 1 then
+        return 1, 1, 0.47
+    end
+
+    if statusIndex == 2 then
+        return 1, 0.6, 0
+    end
+
+    if statusIndex == 3 then
+        return 1, 0, 0
+    end
 end
 
 -- local function IsPlayerEffectivelyTank()
@@ -111,6 +183,11 @@ end
 
 local function CompactUnitFrame_UpdateAggroHighlight(frame)
     if not frame._CAH_aggroHighlight then
+        return
+    end
+
+    if not frame.unit then
+        frame._CAH_aggroHighlight:Hide()
         return
     end
 
@@ -150,11 +227,11 @@ end
 -- end
 
 local function OnThreatUpdated(frame, event, unitGUID, targetGUID, threat)
-    if unitGUID == UnitGUID(frame.unit) or unitGUID == UnitGUID(frame.displayedUnit) then
-        CompactUnitFrame_UpdateAggroHighlight(frame)
+    -- if frame.unit then
+    CompactUnitFrame_UpdateAggroHighlight(frame)
     -- CompactUnitFrame_UpdateAggroFlash(frame)
     -- CompactUnitFrame_UpdateHealthBorder(frame)
-    end
+    -- end
 end
 
 do
@@ -233,7 +310,7 @@ end
 --             return
 --         end
 
---         if not unit then
+--         if not frame.unit then
 --             frame.isTanking = nil
 --         end
 --     end
@@ -242,14 +319,10 @@ end
 hooksecurefunc(
     "CompactUnitFrame_UpdateAll",
     function(frame)
-        if not frame._CAH_aggroHighlight then
-            return
-        end
-
-        if frame.displayedUnit then
-            CompactUnitFrame_UpdateAggroHighlight(frame)
+        -- if frame.displayedUnit then
+        CompactUnitFrame_UpdateAggroHighlight(frame)
         -- CompactUnitFrame_UpdateAggroFlash(frame)
-        end
+        -- end
     end
 )
 
@@ -291,7 +364,6 @@ hooksecurefunc(
 --         end
 
 --         if frame.optionTable.selectedBorderColor and UnitIsUnit(frame.displayedUnit, "target") then
---             SetBorderColor(frame, frame.optionTable.selectedBorderColor:GetRGBA())
 --             return
 --         end
 
@@ -303,11 +375,6 @@ hooksecurefunc(
 --                 SetBorderColor(frame, frame.optionTable.tankBorderColor:GetRGBA())
 --                 return
 --             end
---         end
-
---         if frame.optionTable.defaultBorderColor then
---             SetBorderColor(frame, frame.optionTable.defaultBorderColor:GetRGBA())
---             return
 --         end
 --     end
 -- )
