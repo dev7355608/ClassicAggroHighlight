@@ -3,15 +3,11 @@ if WOW_PROJECT_ID ~= WOW_PROJECT_CLASSIC then
 end
 
 local UnitGUID = UnitGUID
-local UnitIsUnit = UnitIsUnit
 local UnitExists = UnitExists
 
 local groupMembers = {}
 
 local ThreatLib = LibStub("LibThreatClassic2")
-
--- ThreatLib.DebugEnabled = true
--- ThreatLib:RequestActiveOnSolo()
 
 local floor = floor
 
@@ -155,32 +151,6 @@ local function GetThreatStatusColor(statusIndex)
     end
 end
 
--- local function IsPlayerEffectivelyTank()
---     if not IsInRaid() then
---         return false
---     end
-
---     local role = select(10, GetRaidRosterInfo(UnitInRaid("player")))
---     return role == "MAINTANK"
--- end
-
--- local function IsOnThreatList(threatStatus)
---     return threatStatus ~= nil
--- end
-
--- local function SetBorderColor(frame, r, g, b, a)
---     frame.healthBar.border:SetVertexColor(r, g, b, a)
-
---     if frame.castBar and frame.castBar.border then
---         frame.castBar.border:SetVertexColor(r, g, b, a)
---     end
--- end
-
--- local function CompactUnitFrame_IsOnThreatListWithPlayer(unit)
---     local _, threatStatus = UnitDetailedThreatSituation("player", unit)
---     return IsOnThreatList(threatStatus)
--- end
-
 local function CompactUnitFrame_UpdateAggroHighlight(frame)
     if not frame._CAH_aggroHighlight then
         return
@@ -201,39 +171,6 @@ local function CompactUnitFrame_UpdateAggroHighlight(frame)
     end
 end
 
--- local function CompactUnitFrame_UpdateAggroFlash(frame)
---     if not frame._CAH_aggroHighlight or not frame._CAH_LoseAggroAnim then
---         return
---     end
-
---     if not IsPlayerEffectivelyTank() then
---         return
---     end
-
---     local isTanking = UnitDetailedThreatSituation("player", frame.displayedUnit)
-
---     if frame.isTanking ~= isTanking then
---         if frame.isTanking and not isTanking then
---             frame._CAH_aggroHighlight:Show()
---             frame._CAH_LoseAggroAnim:Play()
---         end
-
---         frame.isTanking = isTanking
---     end
-
---     if not frame._CAH_LoseAggroAnim:IsPlaying() then
---         frame._CAH_aggroHighlight:Hide()
---     end
--- end
-
-local function OnThreatUpdated(frame, event, unitGUID, targetGUID, threat)
-    -- if frame.unit then
-    CompactUnitFrame_UpdateAggroHighlight(frame)
-    -- CompactUnitFrame_UpdateAggroFlash(frame)
-    -- CompactUnitFrame_UpdateHealthBorder(frame)
-    -- end
-end
-
 do
     local function getTexture(frame, name)
         while not frame:GetName() do
@@ -249,8 +186,7 @@ do
     end
 
     local texCoords = {
-        ["Raid-AggroFrame"] = {0.00781250, 0.55468750, 0.00781250, 0.27343750},
-        ["Raid-TargetFrame"] = {0.00781250, 0.55468750, 0.28906250, 0.55468750}
+        ["Raid-AggroFrame"] = {0.00781250, 0.55468750, 0.00781250, 0.27343750}
     }
 
     local function setUpFunc(frame)
@@ -303,28 +239,7 @@ do
     )
 end
 
--- hooksecurefunc(
---     "CompactUnitFrame_SetUnit",
---     function(frame, unit)
---         if not frame._CAH_aggroHighlight then
---             return
---         end
-
---         if not frame.unit then
---             frame.isTanking = nil
---         end
---     end
--- )
-
-hooksecurefunc(
-    "CompactUnitFrame_UpdateAll",
-    function(frame)
-        -- if frame.displayedUnit then
-        CompactUnitFrame_UpdateAggroHighlight(frame)
-        -- CompactUnitFrame_UpdateAggroFlash(frame)
-        -- end
-    end
-)
+hooksecurefunc("CompactUnitFrame_UpdateAll", CompactUnitFrame_UpdateAggroHighlight)
 
 hooksecurefunc(
     "CompactUnitFrame_UpdateUnitEvents",
@@ -333,11 +248,11 @@ hooksecurefunc(
             return
         end
 
-        ThreatLib.RegisterCallback(frame, "Activate", OnThreatUpdated, frame)
-        ThreatLib.RegisterCallback(frame, "Deactivate", OnThreatUpdated, frame)
-        ThreatLib.RegisterCallback(frame, "PartyChanged", OnThreatUpdated, frame)
-        ThreatLib.RegisterCallback(frame, "ThreatUpdated", OnThreatUpdated, frame)
-        ThreatLib.RegisterCallback(frame, "ThreatCleared", OnThreatUpdated, frame)
+        ThreatLib.RegisterCallback(frame, "Activate", CompactUnitFrame_UpdateAggroHighlight, frame)
+        ThreatLib.RegisterCallback(frame, "Deactivate", CompactUnitFrame_UpdateAggroHighlight, frame)
+        ThreatLib.RegisterCallback(frame, "PartyChanged", CompactUnitFrame_UpdateAggroHighlight, frame)
+        ThreatLib.RegisterCallback(frame, "ThreatUpdated", CompactUnitFrame_UpdateAggroHighlight, frame)
+        ThreatLib.RegisterCallback(frame, "ThreatCleared", CompactUnitFrame_UpdateAggroHighlight, frame)
     end
 )
 
@@ -355,29 +270,6 @@ hooksecurefunc(
         ThreatLib.UnregisterCallback(frame, "ThreatCleared")
     end
 )
-
--- hooksecurefunc(
---     "CompactUnitFrame_UpdateHealthBorder",
---     function(frame)
---         if not frame._CAH_aggroHighlight then
---             return
---         end
-
---         if frame.optionTable.selectedBorderColor and UnitIsUnit(frame.displayedUnit, "target") then
---             return
---         end
-
---         if frame.optionTable.tankBorderColor and IsInGroup() and IsPlayerEffectivelyTank() then
---             local isTanking, threatStatus = UnitDetailedThreatSituation("player", frame.displayedUnit)
---             local showTankingColor = not isTanking and IsOnThreatList(threatStatus) and IsInGroup()
-
---             if showTankingColor then
---                 SetBorderColor(frame, frame.optionTable.tankBorderColor:GetRGBA())
---                 return
---             end
---         end
---     end
--- )
 
 do
     local petIDs = {["player"] = "pet"}
