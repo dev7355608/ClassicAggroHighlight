@@ -5,11 +5,9 @@ end
 local UnitGUID = UnitGUID
 local UnitExists = UnitExists
 
-local groupMembers = {}
+local unitIDs = {}
 
 local ThreatLib = LibStub("LibThreatClassic2")
-
-local floor = floor
 
 local function GetThreat(unitGUID, targetGUID)
     local data = ThreatLib.threatTargets[unitGUID]
@@ -34,103 +32,88 @@ local function GetMaxThreatOnTarget(targetGUID)
     return maxThreatValue, maxUnitGUID
 end
 
-local function UnitDetailedThreatSituation(unit, target)
-    local isTanking, threatStatus, threatPercent, rawThreatPercent, threatValue = nil, nil, nil, nil, nil
-    local unitGUID, targetGUID = UnitGUID(unit), UnitGUID(target)
-
-    if not unitGUID or not targetGUID then
-        return isTanking, threatStatus, threatPercent, rawThreatPercent, threatValue
-    end
-
-    threatValue = GetThreat(unitGUID, targetGUID)
-
-    if not threatValue then
-        return isTanking, threatStatus, threatPercent, rawThreatPercent, threatValue
-    elseif threatValue < 0 then
-        threatValue = 0
-    end
-
-    isTanking = false
-    threatStatus = 0
-
-    local targetTarget = target .. "-target"
-    local targetTargetGUID = UnitGUID(targetTarget)
-    local targetTargetThreatValue
-
-    if targetTargetGUID then
-        targetTargetThreatValue = GetThreat(targetTargetGUID, targetGUID)
-    end
-
-    if targetTargetThreatValue and targetTargetThreatValue > 0 then
-        if threatValue >= targetTargetThreatValue then
-            if unitGUID == targetTargetGUID then
-                isTanking = true
-
-                local _, maxUnitGUID = GetMaxThreatOnTarget(targetGUID)
-
-                if unitGUID == maxUnitGUID then
-                    threatStatus = 3
-                else
-                    threatStatus = 2
-                end
-            else
-                threatStatus = 1
-            end
-        end
-
-        rawThreatPercent = threatValue / targetTargetThreatValue * 100
-    end
-
-    threatValue = floor(threatValue)
-
-    return isTanking, threatStatus, threatPercent, rawThreatPercent, threatValue
-end
-
-local function UnitThreatSituation(unit, target)
-    if target then
-        local _, threatStatus = UnitDetailedThreatSituation(unit, target)
-        return threatStatus
-    end
+local function UnitThreatSituation(unit)
+    local status = nil
 
     local unitGUID = UnitGUID(unit)
 
     if not unitGUID then
-        return nil
+        return status
     end
 
     local data = ThreatLib.threatTargets[unitGUID]
 
     if not data then
-        return nil
+        return status
     end
 
-    local targetIDs = {}
-
-    for _, target in pairs(groupMembers) do
-        local targetGUID = UnitGUID(target)
-
-        if targetGUID then
-            targetIDs[targetGUID] = target
-        end
-    end
-
-    local threatStatus = nil
+    local targets = {}
+    local current, currentTarget = nil
 
     for targetGUID in pairs(data) do
-        local target = targetIDs[targetGUID]
+        local target = targets[targetGUID]
+
+        if not target then
+            while true do
+                current, currentTarget = next(unitIDs, current)
+
+                if current == nil then
+                    break
+                end
+
+                local currentTargetGUID = UnitGUID(currentTarget)
+
+                if currentTargetGUID then
+                    if currentTargetGUID == targetGUID then
+                        target = currentTarget
+                        break
+                    end
+
+                    targets[currentTargetGUID] = currentTarget
+                end
+            end
+        end
 
         if target then
-            local _, targetThreatStatus = UnitDetailedThreatSituation(unit, target)
+            local threatValue = GetThreat(unitGUID, targetGUID)
 
-            if not threatStatus then
-                threatStatus = targetThreatStatus
-            elseif targetThreatStatus and targetThreatStatus > threatStatus then
-                threatStatus = targetThreatStatus
+            if threatValue then
+                local threatStatus = 0
+
+                local targetTarget = target .. "-target"
+                local targetTargetGUID = UnitGUID(targetTarget)
+                local targetTargetThreatValue
+
+                if targetTargetGUID then
+                    targetTargetThreatValue = GetThreat(targetTargetGUID, targetGUID)
+                end
+
+                if targetTargetThreatValue and targetTargetThreatValue > 0 then
+                    if threatValue >= targetTargetThreatValue then
+                        if unitGUID == targetTargetGUID then
+                            local _, maxUnitGUID = GetMaxThreatOnTarget(targetGUID)
+
+                            if unitGUID == maxUnitGUID then
+                                threatStatus = 3
+                            else
+                                threatStatus = 2
+                            end
+                        else
+                            threatStatus = 1
+                        end
+                    end
+                end
+
+                if not status then
+                    status = threatStatus
+                elseif threatStatus > status then
+                    status = threatStatus
+                end
             end
         end
     end
 
-    return threatStatus
+    return status
 end
 
 local function GetThreatStatusColor(statusIndex)
@@ -156,7 +139,7 @@ local function CompactUnitFrame_UpdateAggroHighlight(frame)
         return
     end
 
-    if not frame.unit or frame.unit:find("target$") then
+    if not UnitExists(frame.displayedUnit) or frame.displayedUnit:find("target$") then
         frame._CAH_aggroHighlight:Hide()
         return
     end
@@ -333,29 +316,29 @@ do
             group = groupRaid
         end
 
-        wipe(groupMembers)
+        wipe(unitIDs)
 
         for _, unit in ipairs(group) do
             if UnitExists(unit) then
-                groupMembers[unit] = unit .. "target"
+                unitIDs[unit] = unit .. "target"
 
                 local pet = petIDs[unit]
 
                 if UnitExists(pet) then
-                    groupMembers[pet] = pet .. "target"
+                    unitIDs[pet] = pet .. "target"
                 end
             end
         end
     end
 
     function eventHandlers.UNIT_PET(unit)
-        if groupMembers[unit] then
+        if unitIDs[unit] then
             local pet = petIDs[unit]
 
             if UnitExists(pet) then
-                groupMembers[pet] = pet .. "target"
+                unitIDs[pet] = pet .. "target"
             else
-                groupMembers[pet] = nil
+                unitIDs[pet] = nil
             end
         end
     end
