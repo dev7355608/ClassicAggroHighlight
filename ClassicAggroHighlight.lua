@@ -48,30 +48,23 @@ local function UnitThreatSituation(unit)
     end
 
     local targets = {}
-    local current, currentTarget = nil
+    local current, currentTarget = next(unitIDs)
 
     for targetGUID in pairs(data) do
         local target = targets[targetGUID]
 
-        if not target then
-            while true do
-                current, currentTarget = next(unitIDs, current)
+        while not target and current do
+            local currentTargetGUID = UnitGUID(currentTarget)
 
-                if current == nil then
-                    break
-                end
-
-                local currentTargetGUID = UnitGUID(currentTarget)
-
-                if currentTargetGUID then
-                    if currentTargetGUID == targetGUID then
-                        target = currentTarget
-                        break
-                    end
-
+            if currentTargetGUID then
+                if currentTargetGUID == targetGUID then
+                    target = currentTarget
+                else
                     targets[currentTargetGUID] = currentTarget
                 end
             end
+
+            current, currentTarget = next(unitIDs, current)
         end
 
         if target then
