@@ -4,6 +4,9 @@ end
 
 local UnitGUID = UnitGUID
 local UnitExists = UnitExists
+local GetTime = GetTime
+local pairs = pairs
+local wipe = wipe
 
 local unitIDs = {}
 
@@ -147,6 +150,31 @@ local function CompactUnitFrame_UpdateAggroHighlight(frame)
     end
 end
 
+local deferredFrames = {}
+local lastFrameTime = -1
+
+local function defer_CompactUnitFrame_UpdateAggroHighlight(frame)
+    if GetTime() > lastFrameTime then
+        deferredFrames[frame] = true
+    else
+        CompactUnitFrame_UpdateAggroHighlight(frame)
+    end
+end
+
+local deferFrame = CreateFrame("Frame")
+deferFrame:SetScript(
+    "OnUpdate",
+    function(self, elapsed)
+        for frame in pairs(deferredFrames) do
+            CompactUnitFrame_UpdateAggroHighlight(frame)
+        end
+
+        wipe(deferredFrames)
+
+        lastFrameTime = GetTime()
+    end
+)
+
 do
     local function getTexture(frame, name)
         while not frame:GetName() do
@@ -215,7 +243,7 @@ do
     )
 end
 
-hooksecurefunc("CompactUnitFrame_UpdateAll", CompactUnitFrame_UpdateAggroHighlight)
+hooksecurefunc("CompactUnitFrame_UpdateAll", defer_CompactUnitFrame_UpdateAggroHighlight)
 
 local function updateCallbacks(frame)
     if not frame._CAH_aggroHighlight then
@@ -226,11 +254,11 @@ local function updateCallbacks(frame)
         if not frame._CAH_callbacksRegistered then
             frame._CAH_callbacksRegistered = true
 
-            ThreatLib.RegisterCallback(frame, "Activate", CompactUnitFrame_UpdateAggroHighlight, frame)
-            ThreatLib.RegisterCallback(frame, "Deactivate", CompactUnitFrame_UpdateAggroHighlight, frame)
-            ThreatLib.RegisterCallback(frame, "PartyChanged", CompactUnitFrame_UpdateAggroHighlight, frame)
-            ThreatLib.RegisterCallback(frame, "ThreatUpdated", CompactUnitFrame_UpdateAggroHighlight, frame)
-            ThreatLib.RegisterCallback(frame, "ThreatCleared", CompactUnitFrame_UpdateAggroHighlight, frame)
+            ThreatLib.RegisterCallback(frame, "Activate", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+            ThreatLib.RegisterCallback(frame, "Deactivate", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+            ThreatLib.RegisterCallback(frame, "PartyChanged", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+            ThreatLib.RegisterCallback(frame, "ThreatUpdated", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+            ThreatLib.RegisterCallback(frame, "ThreatCleared", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
         end
     else
         if frame._CAH_callbacksRegistered then
