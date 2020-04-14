@@ -8,7 +8,7 @@ externals:
         tag: latest
     libs/LibThreatClassic2:
         url: https://github.com/dfherr/LibThreatClassic2
-        tag: r10
+        tag: r11
 
 ignore:
     - README.md
