@@ -10,6 +10,10 @@ local wipe = wipe
 
 local unitIDs = {}
 
+local weaktable = {__mode = "k"}
+local aggroHighlight = setmetatable({}, weaktable)
+local callbacksRegistered = setmetatable({}, weaktable)
+
 local ThreatLib = LibStub("LibThreatClassic2")
 
 local function GetThreat(unitGUID, targetGUID)
@@ -131,22 +135,24 @@ local function GetThreatStatusColor(statusIndex)
 end
 
 local function CompactUnitFrame_UpdateAggroHighlight(frame)
-    if not frame._CAH_aggroHighlight then
+    local aggroHighlight = aggroHighlight[frame]
+
+    if not aggroHighlight then
         return
     end
 
     if not UnitExists(frame.displayedUnit) or frame.displayedUnit:find("target$") then
-        frame._CAH_aggroHighlight:Hide()
+        aggroHighlight:Hide()
         return
     end
 
     local status = UnitThreatSituation(frame.displayedUnit)
 
     if status and status > 0 then
-        frame._CAH_aggroHighlight:SetVertexColor(GetThreatStatusColor(status))
-        frame._CAH_aggroHighlight:Show()
+        aggroHighlight:SetVertexColor(GetThreatStatusColor(status))
+        aggroHighlight:Show()
     else
-        frame._CAH_aggroHighlight:Hide()
+        aggroHighlight:Hide()
     end
 end
 
@@ -176,32 +182,19 @@ deferFrame:SetScript(
 )
 
 do
-    local function getTexture(frame, name)
-        while not frame:GetName() do
-            frame = frame:GetParent()
-        end
-
-        name = name and string.gsub(name, "%$parent", frame:GetName())
-        return name and _G[name] and _G["_CAH_" .. name]
-    end
-
-    local function createTexture(frame, name, layer, subLayer)
-        return getTexture(frame, name) or frame:CreateTexture(name and "_CAH_" .. name, layer, nil, subLayer)
-    end
-
     local texCoords = {
         ["Raid-AggroFrame"] = {0.00781250, 0.55468750, 0.00781250, 0.27343750}
     }
 
     local function setUpFunc(frame)
-        if frame:IsForbidden() or frame._CAH_aggroHighlight then
+        if frame:IsForbidden() or aggroHighlight[frame] then
             return
         end
 
-        frame._CAH_aggroHighlight = createTexture(frame, "$parentAggroHighlight", "ARTWORK")
-        frame._CAH_aggroHighlight:SetTexture("Interface\\RaidFrame\\Raid-FrameHighlights")
-        frame._CAH_aggroHighlight:SetTexCoord(unpack(texCoords["Raid-AggroFrame"]))
-        frame._CAH_aggroHighlight:SetAllPoints(frame)
+        aggroHighlight[frame] = frame:CreateTexture(nil, "ARTWORK")
+        aggroHighlight[frame]:SetTexture("Interface\\RaidFrame\\Raid-FrameHighlights")
+        aggroHighlight[frame]:SetTexCoord(unpack(texCoords["Raid-AggroFrame"]))
+        aggroHighlight[frame]:SetAllPoints(frame)
     end
 
     hooksecurefunc("DefaultCompactUnitFrameSetup", setUpFunc)
@@ -246,13 +239,13 @@ end
 hooksecurefunc("CompactUnitFrame_UpdateAll", defer_CompactUnitFrame_UpdateAggroHighlight)
 
 local function updateCallbacks(frame)
-    if not frame._CAH_aggroHighlight then
+    if not aggroHighlight[frame] then
         return
     end
 
     if frame.unit then
-        if not frame._CAH_callbacksRegistered then
-            frame._CAH_callbacksRegistered = true
+        if not callbacksRegistered[frame] then
+            callbacksRegistered[frame] = true
 
             ThreatLib.RegisterCallback(frame, "Activate", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
             ThreatLib.RegisterCallback(frame, "Deactivate", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
@@ -261,8 +254,8 @@ local function updateCallbacks(frame)
             ThreatLib.RegisterCallback(frame, "ThreatCleared", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
         end
     else
-        if frame._CAH_callbacksRegistered then
-            frame._CAH_callbacksRegistered = false
+        if callbacksRegistered[frame] then
+            callbacksRegistered[frame] = false
 
             ThreatLib.UnregisterCallback(frame, "Activate")
             ThreatLib.UnregisterCallback(frame, "Deactivate")
