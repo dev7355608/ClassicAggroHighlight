@@ -14,106 +14,111 @@ local weaktable = {__mode = "k"}
 local aggroHighlight = setmetatable({}, weaktable)
 local callbacksRegistered = setmetatable({}, weaktable)
 
-local ThreatLib = LibStub("LibThreatClassic2")
+local ThreatLib
+local UnitThreatSituation = _G.UnitThreatSituation
 
-local function GetThreat(unitGUID, targetGUID)
-    local data = ThreatLib.threatTargets[unitGUID]
-    return data and data[targetGUID]
-end
+if not _G.UnitThreatSituation then
+    ThreatLib = LibStub("LibThreatClassic2")
 
-local function GetMaxThreatOnTarget(targetGUID)
-    local maxThreatValue
-    local maxUnitGUID
-
-    for unitGUID, data in pairs(ThreatLib.threatTargets) do
-        local threatValue = data[targetGUID]
-
-        if threatValue then
-            if not maxThreatValue or threatValue > maxThreatValue then
-                maxThreatValue = threatValue
-                maxUnitGUID = unitGUID
-            end
-        end
+    local function GetThreat(unitGUID, targetGUID)
+        local data = ThreatLib.threatTargets[unitGUID]
+        return data and data[targetGUID]
     end
 
-    return maxThreatValue, maxUnitGUID
-end
+    local function GetMaxThreatOnTarget(targetGUID)
+        local maxThreatValue
+        local maxUnitGUID
 
-local function UnitThreatSituation(unit)
-    local status = nil
-
-    local unitGUID = UnitGUID(unit)
-
-    if not unitGUID then
-        return status
-    end
-
-    local data = ThreatLib.threatTargets[unitGUID]
-
-    if not data then
-        return status
-    end
-
-    local targets = {}
-    local current, currentTarget = next(unitIDs)
-
-    for targetGUID in pairs(data) do
-        local target = targets[targetGUID]
-
-        while not target and current do
-            local currentTargetGUID = UnitGUID(currentTarget)
-
-            if currentTargetGUID then
-                if currentTargetGUID == targetGUID then
-                    target = currentTarget
-                else
-                    targets[currentTargetGUID] = currentTarget
-                end
-            end
-
-            current, currentTarget = next(unitIDs, current)
-        end
-
-        if target then
-            local threatValue = GetThreat(unitGUID, targetGUID)
+        for unitGUID, data in pairs(ThreatLib.threatTargets) do
+            local threatValue = data[targetGUID]
 
             if threatValue then
-                local threatStatus = 0
-
-                local targetTarget = target .. "-target"
-                local targetTargetGUID = UnitGUID(targetTarget)
-                local targetTargetThreatValue
-
-                if targetTargetGUID then
-                    targetTargetThreatValue = GetThreat(targetTargetGUID, targetGUID)
+                if not maxThreatValue or threatValue > maxThreatValue then
+                    maxThreatValue = threatValue
+                    maxUnitGUID = unitGUID
                 end
+            end
+        end
 
-                if targetTargetThreatValue and targetTargetThreatValue > 0 then
-                    if threatValue >= targetTargetThreatValue then
-                        if unitGUID == targetTargetGUID then
-                            local _, maxUnitGUID = GetMaxThreatOnTarget(targetGUID)
+        return maxThreatValue, maxUnitGUID
+    end
 
-                            if unitGUID == maxUnitGUID then
-                                threatStatus = 3
-                            else
-                                threatStatus = 2
-                            end
-                        else
-                            threatStatus = 1
-                        end
+    function UnitThreatSituation(unit)
+        local status = nil
+
+        local unitGUID = UnitGUID(unit)
+
+        if not unitGUID then
+            return status
+        end
+
+        local data = ThreatLib.threatTargets[unitGUID]
+
+        if not data then
+            return status
+        end
+
+        local targets = {}
+        local current, currentTarget = next(unitIDs)
+
+        for targetGUID in pairs(data) do
+            local target = targets[targetGUID]
+
+            while not target and current do
+                local currentTargetGUID = UnitGUID(currentTarget)
+
+                if currentTargetGUID then
+                    if currentTargetGUID == targetGUID then
+                        target = currentTarget
+                    else
+                        targets[currentTargetGUID] = currentTarget
                     end
                 end
 
-                if not status then
-                    status = threatStatus
-                elseif threatStatus > status then
-                    status = threatStatus
+                current, currentTarget = next(unitIDs, current)
+            end
+
+            if target then
+                local threatValue = GetThreat(unitGUID, targetGUID)
+
+                if threatValue then
+                    local threatStatus = 0
+
+                    local targetTarget = target .. "-target"
+                    local targetTargetGUID = UnitGUID(targetTarget)
+                    local targetTargetThreatValue
+
+                    if targetTargetGUID then
+                        targetTargetThreatValue = GetThreat(targetTargetGUID, targetGUID)
+                    end
+
+                    if targetTargetThreatValue and targetTargetThreatValue > 0 then
+                        if threatValue >= targetTargetThreatValue then
+                            if unitGUID == targetTargetGUID then
+                                local _, maxUnitGUID = GetMaxThreatOnTarget(targetGUID)
+
+                                if unitGUID == maxUnitGUID then
+                                    threatStatus = 3
+                                else
+                                    threatStatus = 2
+                                end
+                            else
+                                threatStatus = 1
+                            end
+                        end
+                    end
+
+                    if not status then
+                        status = threatStatus
+                    elseif threatStatus > status then
+                        status = threatStatus
+                    end
                 end
             end
         end
-    end
 
-    return status
+        return status
+    end
 end
 
 local function GetThreatStatusColor(statusIndex)
@@ -141,12 +146,14 @@ local function CompactUnitFrame_UpdateAggroHighlight(frame)
         return
     end
 
-    if not UnitExists(frame.displayedUnit) or frame.displayedUnit:find("target$") then
+    local displayedUnit = frame.displayedUnit
+
+    if not UnitExists(displayedUnit) or displayedUnit:find("target$") then
         aggroHighlight:Hide()
         return
     end
 
-    local status = UnitThreatSituation(frame.displayedUnit)
+    local status = UnitThreatSituation(displayedUnit)
 
     if status and status > 0 then
         aggroHighlight:SetVertexColor(GetThreatStatusColor(status))
@@ -167,19 +174,21 @@ local function defer_CompactUnitFrame_UpdateAggroHighlight(frame)
     end
 end
 
-local deferFrame = CreateFrame("Frame")
-deferFrame:SetScript(
-    "OnUpdate",
-    function(self, elapsed)
-        for frame in pairs(deferredFrames) do
-            CompactUnitFrame_UpdateAggroHighlight(frame)
+if not _G.UnitThreatSituation then
+    local deferFrame = CreateFrame("Frame")
+    deferFrame:SetScript(
+        "OnUpdate",
+        function(self, elapsed)
+            for frame in pairs(deferredFrames) do
+                CompactUnitFrame_UpdateAggroHighlight(frame)
+            end
+
+            wipe(deferredFrames)
+
+            lastFrameTime = GetTime()
         end
-
-        wipe(deferredFrames)
-
-        lastFrameTime = GetTime()
-    end
-)
+    )
+end
 
 do
     local texCoords = {
@@ -236,52 +245,104 @@ do
     )
 end
 
-hooksecurefunc("CompactUnitFrame_UpdateAll", defer_CompactUnitFrame_UpdateAggroHighlight)
+if _G.UnitThreatSituation then
+    hooksecurefunc(
+        "CompactUnitFrame_OnEvent",
+        function(self, event, ...)
+            if event == self.updateAllEvent and (not self.updateAllFilter or self.updateAllFilter(self, event, ...)) then
+                return
+            end
 
-local function updateCallbacks(frame)
-    if not aggroHighlight[frame] then
-        return
-    end
+            local unit = ...
 
-    if frame.unit then
-        if not callbacksRegistered[frame] then
-            callbacksRegistered[frame] = true
-
-            ThreatLib.RegisterCallback(frame, "Activate", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
-            ThreatLib.RegisterCallback(frame, "Deactivate", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
-            ThreatLib.RegisterCallback(frame, "PartyChanged", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
-            ThreatLib.RegisterCallback(frame, "ThreatUpdated", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
-            ThreatLib.RegisterCallback(frame, "ThreatCleared", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+            if unit == self.unit or unit == self.displayedUnit then
+                if event == "UNIT_THREAT_SITUATION_UPDATE" then
+                    CompactUnitFrame_UpdateAggroHighlight(self)
+                end
+            end
         end
-    else
-        if callbacksRegistered[frame] then
-            callbacksRegistered[frame] = false
+    )
 
-            ThreatLib.UnregisterCallback(frame, "Activate")
-            ThreatLib.UnregisterCallback(frame, "Deactivate")
-            ThreatLib.UnregisterCallback(frame, "PartyChanged")
-            ThreatLib.UnregisterCallback(frame, "ThreatUpdated")
-            ThreatLib.UnregisterCallback(frame, "ThreatCleared")
-        end
-    end
+    hooksecurefunc("CompactUnitFrame_UpdateAll", CompactUnitFrame_UpdateAggroHighlight)
+else
+    hooksecurefunc("CompactUnitFrame_UpdateAll", defer_CompactUnitFrame_UpdateAggroHighlight)
 end
 
-hooksecurefunc("CompactUnitFrame_RegisterEvents", updateCallbacks)
+if _G.UnitThreatSituation then
+    hooksecurefunc(
+        "CompactUnitFrame_UpdateUnitEvents",
+        function(frame)
+            if not aggroHighlight[frame] then
+                return
+            end
 
-hooksecurefunc("CompactUnitFrame_UnregisterEvents", updateCallbacks)
+            local unit = frame.unit
+            local displayedUnit
 
-hooksecurefunc(
-    "CompactPartyFrame_Generate",
-    function()
-        local name = CompactPartyFrame:GetName()
+            if unit ~= frame.displayedUnit then
+                displayedUnit = frame.displayedUnit
+            end
 
-        for i = 1, MEMBERS_PER_RAID_GROUP do
-            updateCallbacks(_G[name .. "Member" .. i])
+            frame:RegisterUnitEvent("UNIT_THREAT_SITUATION_UPDATE", unit, displayedUnit)
+        end
+    )
+
+    hooksecurefunc(
+        "CompactPartyFrame_Generate",
+        function()
+            local name = CompactPartyFrame:GetName()
+
+            for i = 1, MEMBERS_PER_RAID_GROUP do
+                CompactUnitFrame_RegisterEvents(_G[name .. "Member" .. i])
+            end
+        end
+    )
+else
+    local function updateCallbacks(frame)
+        if not aggroHighlight[frame] then
+            return
+        end
+
+        if frame.unit then
+            if not callbacksRegistered[frame] then
+                callbacksRegistered[frame] = true
+
+                ThreatLib.RegisterCallback(frame, "Activate", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+                ThreatLib.RegisterCallback(frame, "Deactivate", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+                ThreatLib.RegisterCallback(frame, "PartyChanged", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+                ThreatLib.RegisterCallback(frame, "ThreatUpdated", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+                ThreatLib.RegisterCallback(frame, "ThreatCleared", defer_CompactUnitFrame_UpdateAggroHighlight, frame)
+            end
+        else
+            if callbacksRegistered[frame] then
+                callbacksRegistered[frame] = false
+
+                ThreatLib.UnregisterCallback(frame, "Activate")
+                ThreatLib.UnregisterCallback(frame, "Deactivate")
+                ThreatLib.UnregisterCallback(frame, "PartyChanged")
+                ThreatLib.UnregisterCallback(frame, "ThreatUpdated")
+                ThreatLib.UnregisterCallback(frame, "ThreatCleared")
+            end
         end
     end
-)
 
-do
+    hooksecurefunc("CompactUnitFrame_RegisterEvents", updateCallbacks)
+
+    hooksecurefunc("CompactUnitFrame_UnregisterEvents", updateCallbacks)
+
+    hooksecurefunc(
+        "CompactPartyFrame_Generate",
+        function()
+            local name = CompactPartyFrame:GetName()
+
+            for i = 1, MEMBERS_PER_RAID_GROUP do
+                updateCallbacks(_G[name .. "Member" .. i])
+            end
+        end
+    )
+end
+
+if not _G.UnitThreatSituation then
     local petIDs = {["player"] = "pet"}
 
     for i = 1, MAX_PARTY_MEMBERS do
