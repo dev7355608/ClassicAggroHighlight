@@ -191,6 +191,19 @@ if not _G.UnitThreatSituation then
 end
 
 do
+    local function getTexture(frame, name)
+        while not frame:GetName() do
+            frame = frame:GetParent()
+        end
+
+        name = name and string.gsub(name, "%$parent", frame:GetName())
+        return name and _G[name]
+    end
+
+    local function createTexture(frame, name, layer, subLayer)
+        return getTexture(frame, name) or frame:CreateTexture(name, layer, nil, subLayer)
+    end
+
     local texCoords = {
         ["Raid-AggroFrame"] = {0.00781250, 0.55468750, 0.00781250, 0.27343750}
     }
@@ -200,7 +213,7 @@ do
             return
         end
 
-        aggroHighlight[frame] = frame:CreateTexture(nil, "ARTWORK")
+        aggroHighlight[frame] = createTexture(frame, "$parentAggroHighlight", "ARTWORK")
         aggroHighlight[frame]:SetTexture("Interface\\RaidFrame\\Raid-FrameHighlights")
         aggroHighlight[frame]:SetTexCoord(unpack(texCoords["Raid-AggroFrame"]))
         aggroHighlight[frame]:SetAllPoints(frame)
