@@ -2,13 +2,5 @@ package-as: ClassicAggroHighlight
 
 enable-nolib-creation: no
 
-externals:
-    libs/LibStub:
-        url: svn://svn.wowace.com/wow/libstub/mainline/trunk
-        tag: latest
-    libs/LibThreatClassic2:
-        url: https://github.com/dfherr/LibThreatClassic2
-        tag: r12
-
 ignore:
     - README.md
