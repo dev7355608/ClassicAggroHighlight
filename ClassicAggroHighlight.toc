@@ -1,4 +1,4 @@
-## Interface: 11305
+## Interface: 20501
 ## Title: ClassicAggroHighlight
 ## Notes: Adds aggro highlights to the Blizzard raid frames
 ## Version: @project-version@
