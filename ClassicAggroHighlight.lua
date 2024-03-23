@@ -70,7 +70,7 @@ do
             return
         end
 
-        aggroHighlights[frame] = createTexture(frame, "$parentAggroHighlight", "ARTWORK")
+        aggroHighlights[frame] = createTexture(frame, "$parentAggroHighlight", "ARTWORK", 7)
         aggroHighlights[frame]:SetTexture("Interface\\RaidFrame\\Raid-FrameHighlights")
         aggroHighlights[frame]:SetTexCoord(unpack(texCoords["Raid-AggroFrame"]))
         aggroHighlights[frame]:SetAllPoints(frame)
